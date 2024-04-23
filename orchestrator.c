@@ -7,6 +7,8 @@
 #include <sys/types.h>
 #include <time.h>
 #include <sys/wait.h>
+#include <sys/time.h>
+
 
 #define PIPE_NAME "/tmp/orchestrator_pipe"
 #define MAX_TASKS 100
@@ -15,8 +17,8 @@ typedef struct {
     int id;
     char command[256];
     int estimated_time;
-    time_t start_time;
-    time_t end_time;
+    struct timeval start_time;
+    struct timeval end_time;
     int status; // 0 = waiting, 1 = running, 2 = completed
     pid_t pid;
 } task_t;
@@ -26,13 +28,16 @@ int task_count = 0;
 int parallel_tasks;
 
 void log_task_completion(task_t task) {
-    FILE *log_file = fopen("task_log.txt", "a");
+    FILE *log_file = fopen("task_log_geral.txt", "a");
     if (log_file == NULL) {
         perror("Failed to open log file");
         return;
     }
-    fprintf(log_file, "Task ID: %d, Command: %s, Estimated Time: %d ms, Real Time: %ld s\n",
-            task.id, task.command, task.estimated_time, task.end_time - task.start_time);
+    long seconds = task.end_time.tv_sec - task.start_time.tv_sec;
+    long useconds = task.end_time.tv_usec - task.start_time.tv_usec;
+    double duration = seconds + useconds / 1E6;
+    fprintf(log_file, "Task ID: %d, Command: %s, Estimated Time: %d ms, Real Time: %.6f s\n",
+            task.id, task.command, task.estimated_time, duration);
     fclose(log_file);
 }
 
@@ -42,11 +47,17 @@ void add_task(char *command, int estimated_time) {
         fprintf(stderr, "Maximum task limit reached.\n");
         return;
     }
+    struct timeval now;
+    gettimeofday(&now, NULL); // Pega o tempo atual em segundos e microssegundos
+
     tasks[task_count].id = task_count;
     strcpy(tasks[task_count].command, command);
     tasks[task_count].estimated_time = estimated_time;
     tasks[task_count].status = 0;
-    tasks[task_count].start_time = time(NULL);
+    tasks[task_count].start_time = now;
+
+//    snprintf(tasks[task_count].log_filename, sizeof(tasks[task_count].log_filename), "task_log_%d.txt", tasks[task_count].id);
+    
     printf("Task %d added: %s\n", tasks[task_count].id, tasks[task_count].command);
     task_count++;
 }
@@ -54,13 +65,15 @@ void add_task(char *command, int estimated_time) {
 void check_task_completion(int *active_tasks) {
     int status;
     pid_t pid;
+    struct timeval now;
     while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
         for (int j = 0; j < task_count; j++) {
             if (tasks[j].pid == pid) {
-                tasks[j].end_time = time(NULL);
+                gettimeofday(&now, NULL);
+                tasks[j].end_time = now;
                 tasks[j].status = 2; // Marca como completada
                 printf("Task %d completed\n", tasks[j].id);
-                log_task_completion(tasks[j]); // Registro da tarefa completada no arquivo de log
+                log_task_completion(tasks[j]);
                 (*active_tasks)--;
             }
         }
@@ -68,6 +81,49 @@ void check_task_completion(int *active_tasks) {
 }
 
 void process_tasks() {
+
+    int active_tasks = 0;
+
+    for (int i = 0; i < task_count; i++) {
+        if (tasks[i].status == 0 && active_tasks < parallel_tasks) {
+            pid_t pid = fork();
+            if (pid == 0) { // Processo filho
+                char log_filename[256]; // Buffer para o nome do arquivo de log
+                sprintf(log_filename, "logs/task_log_id%d.txt", tasks[i].id); // Gerando o nome do arquivo
+
+                // Abrindo arquivo de log para stdout e stderr
+                int log_fd = open(log_filename, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+                if (log_fd < 0) {
+                    perror("Failed to open log file");
+                    exit(EXIT_FAILURE);
+                }
+
+                // Redirecionando stdout e stderr para o arquivo de log
+                dup2(log_fd, STDOUT_FILENO);
+                dup2(log_fd, STDERR_FILENO);
+                close(log_fd);
+
+                // Executando o comando
+                execlp("sh", "sh", "-c", tasks[i].command, NULL);
+                exit(EXIT_FAILURE); // Saída em caso de falha na execução
+            } else if (pid > 0) { // Processo pai
+                tasks[i].pid = pid;
+                tasks[i].status = 1;
+                gettimeofday(&tasks[i].start_time, NULL); // Substitua isso pela chamada correta
+                active_tasks++;
+            } else {
+                perror("Failed to fork");
+            }
+        }
+    }
+
+    check_task_completion(&active_tasks);
+}   
+
+
+/* FUNÇÃO PROCESS  CERTA
+void process_tasks() {
+    struct timeval now;
     int active_tasks = 0;
     for (int i = 0; i < task_count; i++) {
         if (tasks[i].status == 0 && active_tasks < parallel_tasks) {
@@ -76,9 +132,10 @@ void process_tasks() {
                 execlp("sh", "sh", "-c", tasks[i].command, NULL);
                 exit(EXIT_FAILURE);
             } else if (pid > 0) { // Processo pai
+                gettimeofday(&now, NULL);
+                tasks[i].start_time = now;
                 tasks[i].pid = pid;
                 tasks[i].status = 1;
-                tasks[i].start_time = time(NULL);
                 active_tasks++;
             } else {
                 perror("Failed to fork");
@@ -86,10 +143,9 @@ void process_tasks() {
         }
     }
 
-    // Verificar a conclusão de tarefas fora do loop de criação de tarefas
     check_task_completion(&active_tasks);
 }
-
+*/
 
 void handle_status_request() {
     for (int i = 0; i < task_count; i++) {
@@ -98,11 +154,13 @@ void handle_status_request() {
         } else if (tasks[i].status == 0) {
             printf("Task %d waiting: %s\n", tasks[i].id, tasks[i].command);
         } else if (tasks[i].status == 2) {
-            printf("Task %d completed: %s, Duration: %ld seconds\n", tasks[i].id, tasks[i].command, tasks[i].end_time - tasks[i].start_time);
+            long seconds = tasks[i].end_time.tv_sec - tasks[i].start_time.tv_sec;
+            long useconds = tasks[i].end_time.tv_usec - tasks[i].start_time.tv_usec;
+            double duration = seconds + useconds / 1E6; // Convertendo microssegundos em segundos e somando
+            printf("Task %d completed: %s, Duration: %.6f seconds\n", tasks[i].id, tasks[i].command, duration);
         }
     }
 }
-
 int main(int argc, char *argv[]) {
     if (argc != 4) {
         fprintf(stderr, "Usage: %s output_folder parallel_tasks sched_policy\n", argv[0]);
