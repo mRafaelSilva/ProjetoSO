@@ -1,3 +1,7 @@
+// quando faço algum comando que deie erro, o erro não 
+// imprime no terminal, apenas vai para o ficheiro log.txt ... 
+// é suposto imprimir no terminal
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -42,6 +46,7 @@ void log_task_completion(task_t task) {
 }
 
 
+/*
 void add_task(char *command, int estimated_time) {
     if (task_count >= MAX_TASKS) {
         fprintf(stderr, "Maximum task limit reached.\n");
@@ -61,7 +66,7 @@ void add_task(char *command, int estimated_time) {
     printf("Task %d added: %s\n", tasks[task_count].id, tasks[task_count].command);
     task_count++;
 }
-
+*/
 void check_task_completion(int *active_tasks) {
     int status;
     pid_t pid;
@@ -79,7 +84,83 @@ void check_task_completion(int *active_tasks) {
         }
     }
 }
+void add_task(char *command, int estimated_time) {
+    if (task_count >= MAX_TASKS) {
+        fprintf(stderr, "Maximum task limit reached.\n");
+        return;
+    }
 
+    // Encontrar a posição correta para inserir a nova tarefa
+    int pos = 0;
+    while (pos < task_count && tasks[pos].estimated_time <= estimated_time) {
+        pos++;
+    }
+
+    // Mover as tarefas existentes para abrir espaço para a nova tarefa
+    for (int i = task_count; i > pos; i--) {
+        tasks[i] = tasks[i - 1];
+    }
+
+    // Inserir a nova tarefa
+    tasks[pos].id = task_count;
+    strcpy(tasks[pos].command, command);
+    tasks[pos].estimated_time = estimated_time;
+    tasks[pos].status = 0;
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    tasks[pos].start_time = now;
+
+    printf("Task %d added: %s\n", tasks[pos].id, tasks[pos].command);
+    task_count++;
+}
+
+
+void process_tasks() {
+    int active_tasks = 0;
+
+    // Contar quantas tarefas já estão em execução
+    for (int i = 0; i < task_count; i++) {
+        if (tasks[i].status == 1) {
+            active_tasks++;
+        }
+    }
+
+    for (int i = 0; i < task_count; i++) {
+        // Somente inicia novas tarefas se menos do que o limite de tarefas paralelas estão ativas
+        if (tasks[i].status == 0 && active_tasks < parallel_tasks) {
+            pid_t pid = fork();
+            if (pid == 0) { // Processo filho
+                char log_filename[256];
+                sprintf(log_filename, "logs/task_log_id%d.txt", tasks[i].id); // Nome do arquivo de log
+
+                int log_fd = open(log_filename, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+                if (log_fd < 0) {
+                    perror("Failed to open log file");
+                    exit(EXIT_FAILURE);
+                }
+
+                dup2(log_fd, STDOUT_FILENO);
+                dup2(log_fd, STDERR_FILENO);
+                close(log_fd);
+
+                execlp("sh", "sh", "-c", tasks[i].command, NULL);
+                exit(EXIT_FAILURE);
+            } else if (pid > 0) { // Processo pai
+                tasks[i].pid = pid;
+                tasks[i].status = 1; // Marca a tarefa como em execução
+                gettimeofday(&tasks[i].start_time, NULL);
+                active_tasks++; // Incrementa o contador de tarefas ativas
+            } else {
+                perror("Failed to fork");
+            }
+        }
+    }
+
+    // A função check_task_completion pode ser chamada aqui para verificar tarefas concluídas e decrementar active_tasks
+    check_task_completion(&active_tasks);
+}
+
+/* FUNÇÃO PROCESS  CERTA
 void process_tasks() {
 
     int active_tasks = 0;
@@ -121,30 +202,6 @@ void process_tasks() {
 }   
 
 
-/* FUNÇÃO PROCESS  CERTA
-void process_tasks() {
-    struct timeval now;
-    int active_tasks = 0;
-    for (int i = 0; i < task_count; i++) {
-        if (tasks[i].status == 0 && active_tasks < parallel_tasks) {
-            pid_t pid = fork();
-            if (pid == 0) { // Processo filho
-                execlp("sh", "sh", "-c", tasks[i].command, NULL);
-                exit(EXIT_FAILURE);
-            } else if (pid > 0) { // Processo pai
-                gettimeofday(&now, NULL);
-                tasks[i].start_time = now;
-                tasks[i].pid = pid;
-                tasks[i].status = 1;
-                active_tasks++;
-            } else {
-                perror("Failed to fork");
-            }
-        }
-    }
-
-    check_task_completion(&active_tasks);
-}
 */
 
 void handle_status_request() {
