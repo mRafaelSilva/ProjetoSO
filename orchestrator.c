@@ -18,7 +18,7 @@
         char tipo[2];
         int tempo_estado;
         struct timeval hora_inicio;
-        struct timeval hora_fim;
+        struct timeval hora_fim;    
         int status; // 0 = à espera, 1 = a correr, 2 = completo
         pid_t pid;
     } task_t;
@@ -55,7 +55,11 @@
                     tasks[j].hora_fim = now;
                     tasks[j].status = 2;  // Marca como completa
                     log_task_completion(tasks[j]);
-                    printf("Task %d completada\n", tasks[j].id); // Imprime no terminal
+
+                    char output[128];
+                    int length = snprintf(output, sizeof(output), "Task %d completada\n", tasks[j].id);
+                    write(STDOUT_FILENO, output, length); // Imprime no terminal usando write
+
                     (*active_tasks)--;
                     break;  // Sai do loop após encontrar e tratar a tarefa
                 }
@@ -67,7 +71,8 @@
 
     void add_task(char *comando, char *tipo, int tempo_estado) {
         if (task_count >= MAX_TASKS) {
-            fprintf(stderr, "Atingiu-se o limite máximo de tarefas.\n");
+            char error_msg[] = "Atingiu-se o limite máximo de tarefas.\n";
+            write(STDERR_FILENO, error_msg, sizeof(error_msg));
             return;
         }
 
@@ -89,7 +94,10 @@
         gettimeofday(&now, NULL);
         tasks[pos].hora_inicio = now;
 
-        printf("Task %d adicionada: %s\n", tasks[pos].id, tasks[pos].comando);
+        char output[256];
+        int length = snprintf(output, sizeof(output), "Task %d adicionada: %s\n", tasks[pos].id, tasks[pos].comando);
+        write(STDOUT_FILENO, output, length);
+        
         task_count++;
     }
 
@@ -162,7 +170,9 @@
 
     int main(int argc, char *argv[]) {
         if (argc != 4) {
-            fprintf(stderr, "Usage: %s output_folder parallel_tasks sched_policy\n", argv[0]);
+            char usage_msg[256];
+            snprintf(usage_msg, sizeof(usage_msg), "Usage: %s output_folder parallel_tasks sched_policy\n", argv[0]);
+            write(STDERR_FILENO, usage_msg, strlen(usage_msg));
             exit(EXIT_FAILURE);
         }
 

@@ -27,14 +27,25 @@
         } else if (strcmp(argv[1], "execute") == 0 && argc == 5) {
             snprintf(cmd_buffer, sizeof(cmd_buffer), "%s %s %s \"%s\"", argv[1], argv[2], argv[3], argv[4]);
         } else {
-            fprintf(stderr, "Comando inválido\n");
+            const char* msg = "Comando inválido\n";
+            write(STDERR_FILENO, msg, strlen(msg)); // Escreve na saída de erro
             exit(EXIT_FAILURE);
         }
 
         write(pipe_fd, cmd_buffer, strlen(cmd_buffer) + 1); 
         close(pipe_fd);
 
-        printf("Comando entregue: %s\n", cmd_buffer); 
+        char confirmation[1024];
+    //    snprintf(confirmation, sizeof(confirmation), "Comando entregue: %s\n", cmd_buffer);
+    //    write(STDOUT_FILENO, confirmation, strlen(confirmation)); // Escreve na saída padrão
+        int message_len = snprintf(confirmation, sizeof(confirmation), "Comando entregue: %s\n", cmd_buffer);
+        if (message_len > 0 && message_len < sizeof(confirmation)) {
+            write(STDOUT_FILENO, confirmation, message_len);
+        } else {
+            // Caso a mensagem tenha sido maior que o buffer, lidar com isso de forma adequada
+            write(STDOUT_FILENO, "Comando entregue, mas a mensagem é muito longa para exibição completa.\n", 68);
+        }
 
+    
         return 0;
     }
