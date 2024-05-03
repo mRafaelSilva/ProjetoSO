@@ -10,6 +10,7 @@
 #include <sys/time.h>
 
 #define PIPE_NAME "/tmp/orchestrator_pipe"
+#define PIPE_2 "/tmp/responde_pipe"
 
 #define MAX_TASKS 100
 
@@ -77,7 +78,7 @@ void check_task_completion(int *active_tasks) {
     }
 }
 
-    void add_task(char *comando, char *tipo, int tempo_estado) {
+    void add_task(char *comando, char *tipo, int tempo_estado, int fd_response) {
         if (task_count >= MAX_TASKS) {
             char error_msg[] = "Atingiu-se o limite máximo de tarefas.\n";
             write(STDERR_FILENO, error_msg, sizeof(error_msg));
@@ -94,6 +95,7 @@ void check_task_completion(int *active_tasks) {
         }
 
         tasks[pos].id = task_count;
+
         strcpy(tasks[pos].comando, comando);
         strcpy(tasks[pos].tipo, tipo);
         tasks[pos].tempo_estado = tempo_estado;
@@ -105,6 +107,7 @@ void check_task_completion(int *active_tasks) {
         char output[256];
         int length = snprintf(output, sizeof(output), "Task %d adicionada: %s\n", tasks[pos].id, tasks[pos].comando);
         write(STDOUT_FILENO, output, length);
+        write(fd_response, &task_count, sizeof(task_count));
 
         task_count++;
     }
@@ -225,6 +228,13 @@ void execute_task(int task_index) {
             exit(EXIT_FAILURE);
         }
 
+        mkfifo(PIPE_2, 0666);
+        int response_fd = open(PIPE_2, O_WRONLY);
+        if (response_fd < 0) {
+            perror("Falha a abrir o pipe de resposta");
+            exit(EXIT_FAILURE);
+        }        
+
 
         char buffer[1024];
         while (1) {
@@ -237,7 +247,7 @@ void execute_task(int task_index) {
                         char comando[256], tipo[2];
                         int tempo_estado;
                     if (sscanf(ptr, "execute %d %2s \"%[^\"]\"", &tempo_estado, tipo, comando) == 3) {
-                        add_task(comando, tipo, tempo_estado);
+                        add_task(comando, tipo, tempo_estado, response_fd);
                     }
                         ptr += strlen(ptr) + 1; 
                     } else if (strncmp(ptr, "status", 6) == 0) {

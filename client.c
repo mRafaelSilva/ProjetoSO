@@ -7,6 +7,8 @@
 #include <sys/types.h>
 
 #define PIPE_NAME "/tmp/orchestrator_pipe"
+#define PIPE_2 "/tmp/responde_pipe"
+
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -19,6 +21,14 @@ int main(int argc, char *argv[]) {
         perror("Não deu para abrir o pipe");
         exit(EXIT_FAILURE);
     }
+
+    int responde_fd = open(PIPE_2, O_RDONLY);
+    if (responde_fd < 0) {
+        perror("Não deu para abrir o pipe de resposta");
+        exit(EXIT_FAILURE);
+    }
+
+    int id;
 
     char cmd_buffer[1024];
 
@@ -35,16 +45,24 @@ int main(int argc, char *argv[]) {
     write(pipe_fd, cmd_buffer, strlen(cmd_buffer) + 1); 
     close(pipe_fd);
 
-    char confirmation[1024];
-    //    snprintf(confirmation, sizeof(confirmation), "Comando entregue: %s\n", cmd_buffer);
-    //    write(STDOUT_FILENO, confirmation, strlen(confirmation)); // Escreve na saída padrão
-    int message_len = snprintf(confirmation, sizeof(confirmation), "Comando entregue: %s\n", cmd_buffer);
-    if (message_len > 0 && message_len < sizeof(confirmation)) {
-        write(STDOUT_FILENO, confirmation, message_len);
-    } else {
-        // Caso a mensagem tenha sido maior que o buffer, lidar com isso de forma adequada
-        write(STDOUT_FILENO, "Comando entregue, mas a mensagem é muito longa para exibição completa.\n", 68);
+    char id_task[1024];
+
+    if (read(responde_fd, &id, sizeof(id)) < 0) {
+        perror("Falha ao ler do FIFO");
+        close(responde_fd);
+        return EXIT_FAILURE;
     }
+
+    int length = snprintf(id_task, sizeof(id_task), "Comando recebido. Foi atribuído à tarefa '%s' o id; %d\n", argv[4], id);
+    if (length > 0 && length <  sizeof(id_task)) {
+        write (STDOUT_FILENO, id_task, length);
+    } else {
+        write(STDOUT_FILENO, "ID da tarefa recebido, mas a mensagem é muito grande.\n", 56);
+
+    }
+
+    close (responde_fd);
+
     
     return 0;
 }
