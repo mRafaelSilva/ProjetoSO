@@ -34,18 +34,18 @@ int main(int argc, char *argv[]) {
 
     if (strcmp(argv[1], "status") == 0) {
         strcpy(cmd_buffer, "status");
+        close (responde_fd);
+
+        write(pipe_fd, cmd_buffer, strlen(cmd_buffer) + 1); 
+        close(pipe_fd);
+
     } else if (strcmp(argv[1], "execute") == 0 && argc == 5) {
         snprintf(cmd_buffer, sizeof(cmd_buffer), "%s %s %s \"%s\"", argv[1], argv[2], argv[3], argv[4]);
-    } else {
-        const char* msg = "Comando inválido\n";
-        write(STDERR_FILENO, msg, strlen(msg)); // Escreve na saída de erro
-        exit(EXIT_FAILURE);
-    }
 
-    write(pipe_fd, cmd_buffer, strlen(cmd_buffer) + 1); 
-    close(pipe_fd);
+        write(pipe_fd, cmd_buffer, strlen(cmd_buffer) + 1); 
+        close(pipe_fd);  
 
-    char id_task[1024];
+        char id_task[1024];
 
     if (read(responde_fd, &id, sizeof(id)) < 0) {
         perror("Falha ao ler do FIFO");
@@ -62,6 +62,15 @@ int main(int argc, char *argv[]) {
     }
 
     close (responde_fd);
+
+    } else {
+        const char* msg = "Comando inválido\n";
+        write(STDERR_FILENO, msg, strlen(msg)); // Escreve na saída de erro
+        close (pipe_fd);
+        close (responde_fd);
+        exit(EXIT_FAILURE);
+    }
+
 
     
     return 0;

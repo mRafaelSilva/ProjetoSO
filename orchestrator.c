@@ -188,27 +188,39 @@ void execute_task(int task_index) {
 }
 
     void handle_status_request() {
+        write(STDOUT_FILENO, "A serem executadas\n", 20);
         for (int i = 0; i < task_count; i++) {
             if (tasks[i].status == 1) {
                 char msg[1024];
                 snprintf(msg, sizeof(msg), "Task %d a correr: %s\n", tasks[i].id, tasks[i].comando);
                 write(STDOUT_FILENO, msg, strlen(msg));
-            //    printf("Task %d a correr: %s\n", tasks[i].id, tasks[i].comando);
-            } else if (tasks[i].status == 0) {
+            } 
+        }
+
+        write(STDOUT_FILENO, "Em espera\n", 10);
+
+        for (int i = 0; i < task_count; i++) {
+            if (tasks[i].status == 0) {
+
                 char msg[1024];
                 snprintf(msg, sizeof(msg), "Task %d à espera: %s\n", tasks[i].id, tasks[i].comando);
                 write(STDOUT_FILENO, msg, strlen(msg));
-            //    printf("Task %d à espera: %s\n", tasks[i].id, tasks[i].comando);
-            } else if (tasks[i].status == 2) {
+            } 
+
+        }
+        write(STDOUT_FILENO, "Completadas\n", 12);
+
+        for (int i = 0; i<task_count; i++) {
+
+            if (tasks[i].status == 2) {
                 long seconds = tasks[i].hora_fim.tv_sec - tasks[i].hora_inicio.tv_sec;
                 long useconds = tasks[i].hora_fim.tv_usec - tasks[i].hora_inicio.tv_usec;
                 double duration = seconds + useconds / 1E6;
                 char msg[1024];
                 snprintf(msg, sizeof(msg), "Task %d completada: %s, Duração: %.6f segundos\n", tasks[i].id, tasks[i].comando, duration);
-                write(STDOUT_FILENO, msg, strlen(msg));
-                
-            //    printf("Task %d completada: %s, Duração: %.6f segundos\n", tasks[i].id, tasks[i].comando, duration);
+                write(STDOUT_FILENO, msg, strlen(msg));                
             }
+
         }
     }
 
