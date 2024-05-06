@@ -1,50 +1,10 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <time.h>
-#include <sys/wait.h>
-#include <sys/time.h>
-
-#define PIPE_NAME "/tmp/orchestrator_pipe"
-#define PIPE_2 "/tmp/responde_pipe"
-
-#define MAX_TASKS 100
-
-typedef struct {
-    int id;
-    char comando[256];
-    char tipo[2];
-    int tempo_estado;
-    struct timeval hora_inicio;
-    struct timeval hora_fim;    
-    int status; // 0 = waiting, 1 = running, 2 = completed
-    pid_t pid;
-    int pipefd[2];
-} task_t;
+#include "orchestrator.h"
+#include "log.h"
 
 task_t tasks[MAX_TASKS];
 int task_count = 0;
 int parallel_tasks;
 
-
-// faz o registro da tarefa no arquivo
-void log_task_completion(task_t task) {
-    FILE *log_file = fopen("task_log_geral.txt", "a");
-    if (log_file == NULL) {
-        perror("Failed to open log file");
-        return;
-    }
-    long seconds = task.hora_fim.tv_sec - task.hora_inicio.tv_sec;
-    long useconds = task.hora_fim.tv_usec - task.hora_inicio.tv_usec;
-    double duration = seconds + useconds / 1E6; 
-    fprintf(log_file, "Task ID: %d, Comando: %s, Tempo Estimado: %d ms, Tempo Real: %.6f s\n",
-            task.id, task.comando, task.tempo_estado, duration);
-    fclose(log_file);
-}
 
 void check_task_completion(int *active_tasks) {
     int done_signal;
@@ -157,7 +117,7 @@ void execute_task(int task_index) {
     }
 }
 
-    void process_tasks() {
+void process_tasks() {
     static int active_tasks = 0;
 
     check_task_completion(&active_tasks);
@@ -187,7 +147,7 @@ void execute_task(int task_index) {
     }
 }
 
-    void handle_status_request() {
+void handle_status_request() {
         write(STDOUT_FILENO, "A serem executadas\n", 20);
         for (int i = 0; i < task_count; i++) {
             if (tasks[i].status == 1) {
@@ -222,7 +182,7 @@ void execute_task(int task_index) {
             }
 
         }
-    }
+}
 
     int main(int argc, char *argv[]) {
         if (argc != 4) {

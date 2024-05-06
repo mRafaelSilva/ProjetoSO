@@ -1,14 +1,4 @@
-#include <stdio.h>  //servidor a dizer o id da tarefa ao cliente;  meter a tarefa a ser enviada através de uma struct para o servidor
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-
-#define PIPE_NAME "/tmp/orchestrator_pipe"
-#define PIPE_2 "/tmp/responde_pipe"
-
+#include "client.h"
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
