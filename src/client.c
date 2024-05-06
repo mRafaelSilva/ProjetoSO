@@ -1,5 +1,10 @@
 #include "client.h"
 
+/*
+Este ficheiro está bastante simples uma vez que apenas envia o pedido de um cliente para o servidor. A informação é enviada através de um buffer que, mais tarde, será convertido para uma
+struct.
+*/
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <command> [args]\n", argv[0]);

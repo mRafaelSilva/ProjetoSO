@@ -31,10 +31,10 @@ typedef struct{
 }task_t;
 
 
-void check_task_completion(int *active_tasks);
-void add_task(char *comando, char *tipo, int tempo_estado, int fd_response);
-void execute_task(int task_index);
-void process_tasks();
-void handle_status_request();
+void verifica_se_terminou(int *active_tasks);
+void adiciona_task(char *comando, char *tipo, int tempo_estado, int fd_response);
+void executa_task(int task_index);
+void processa_tasks();
+void handle_status();
 
 #endif /* ORCHESTRATOR_H */

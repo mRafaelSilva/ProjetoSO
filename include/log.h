@@ -3,6 +3,6 @@
 
 #include "orchestrator.h"
 
-void log_task_completion(task_t task);
+void log_task_completa(task_t task);
 
 #endif

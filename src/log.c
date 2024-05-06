@@ -1,8 +1,11 @@
 #include "log.h"
 
 
-// faz o registro da tarefa no arquivo
-void log_task_completion(task_t task) {
+/*
+A função "log_task_completa" faz o registro da tarefa no arquivo dos logs gerais.
+*/ 
+
+void log_task_completa(task_t task) {
     FILE *log_file = fopen("task_log_geral.txt", "a");
     if (log_file == NULL) {
         perror("Failed to open log file");
